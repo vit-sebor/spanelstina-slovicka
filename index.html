@@ -4,10 +4,10 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#f7f8f4">
-  <meta name="description" content="Interaktivní španělské kartičky – lekce 1 až 4. Chytré opakování, výslovnost a sledování pokroku.">
+  <meta name="description" content="Interaktivní španělské kartičky – lekce 1 až 7. Chytré opakování, výslovnost a sledování pokroku.">
   <link rel="icon" href="icon.svg" type="image/svg+xml">
   <link rel="manifest" href="manifest.webmanifest">
-  <title>¡Hola! | Španělština – slovíčka (lekce 1–4)</title>
+  <title>¡Hola! | Španělština – slovíčka (lekce 1–7)</title>
   <style>
     :root{--bg:#f7f8f4;--paper:#ffffff;--ink:#162d29;--muted:#64736f;--line:#dde7e1;--green:#16765f;--green-deep:#0c5b48;--mint:#e0f3e7;--cream:#fff6e5;--orange:#c66a34;--pale:#f1f5f2;--shadow:0 14px 40px rgba(29,66,51,.07)}
     *{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:radial-gradient(circle at 80% 1%,#eaf5ec 0,transparent 34%),var(--bg);font:16px/1.48 -apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;color:var(--ink);min-height:100vh}
@@ -54,11 +54,14 @@
     .lesson-chip small{font-size:11px;font-weight:600;color:#64736f;display:block;margin-top:3px}
     .lesson-banner{font-size:13px;color:#765829;background:var(--cream);border:1px solid #eadbb9;border-radius:12px;padding:11px 13px;margin:1px 0 18px}
     @media(max-width:570px){.lesson-picker{margin-right:-17px;padding-right:17px}.vocab-row{grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:7px}.vocab-row .status{grid-column:1;grid-row:2;justify-self:start}.vocab-row .row-btn{grid-column:2;grid-row:2;justify-self:end;min-height:44px}.vocab-word,.vocab-trans{overflow-wrap:anywhere}}
+
+    .lesson-scroll-hint{display:none;color:var(--muted);font-size:12px;margin:-13px 0 15px;text-align:right}
+    @media(max-width:570px){.lesson-scroll-hint{display:block}.lesson-picker{scrollbar-width:none}.lesson-picker::-webkit-scrollbar{display:none}}
   </style>
 </head>
 <body>
   <header class="site-header"><div class="wrap header-inner">
-    <div class="brand"><div class="brand-mark"><span>¡</span></div><div>Hola!<small>Španělština • Lekce 1–4</small></div></div>
+    <div class="brand"><div class="brand-mark"><span>¡</span></div><div>Hola!<small>Španělština • Lekce 1–7</small></div></div>
     <nav aria-label="Hlavní navigace">
       <button type="button" data-tab="home" aria-current="page">Učit se</button>
       <button type="button" data-tab="progress">Pokrok</button>
@@ -124,9 +127,9 @@
     function shuffle(arr){const a=[...arr];for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
     function dirLabel(){return state.direction==='cs-es'?'Česky → španělsky':'Španělsky → česky'}
     function nav(t){tab=t;session=null;query='';wordFilter='all';window.scrollTo({top:0,behavior:'smooth'});render()}
-    function currentLabel(){return selectedLesson==='all'?'LEKCE 1–4 · VŠECHNA SLOVÍČKA':'LECCIÓN '+selectedLesson+' · '+LESSONS[Number(selectedLesson)-1].title.toLocaleUpperCase('es-ES')}
+    function currentLabel(){return selectedLesson==='all'?'LEKCE 1–7 · VŠECHNA SLOVÍČKA':'LECCIÓN '+selectedLesson+' · '+LESSONS[Number(selectedLesson)-1].title.toLocaleUpperCase('es-ES')}
     function commonHeader(){return `<div class="eyebrow">${html(currentLabel())}</div>`}
-    function lessonPicker(){return `<div class="lesson-picker" role="group" aria-label="Vybrat lekci">${LESSONS.map(l=>`<button type="button" class="lesson-chip ${selectedLesson===String(l.number)?'active':''}" data-lesson="${l.number}" aria-pressed="${selectedLesson===String(l.number)}">Lekce ${l.number}<small>${l.words.length} slov${l.partial?' · část':''}</small></button>`).join('')}<button type="button" class="lesson-chip ${selectedLesson==='all'?'active':''}" data-lesson="all" aria-pressed="${selectedLesson==='all'}">Všechny lekce<small>${ALL_WORDS.length} slov</small></button></div>`}
+    function lessonPicker(){return `<div class="lesson-picker" role="group" aria-label="Vybrat lekci">${LESSONS.map(l=>`<button type="button" class="lesson-chip ${selectedLesson===String(l.number)?'active':''}" data-lesson="${l.number}" aria-pressed="${selectedLesson===String(l.number)}">Lekce ${l.number}<small>${l.words.length} slov${l.partial?' · část':''}</small></button>`).join('')}<button type="button" class="lesson-chip ${selectedLesson==='all'?'active':''}" data-lesson="all" aria-pressed="${selectedLesson==='all'}">Všechny lekce<small>${ALL_WORDS.length} slov</small></button></div><p class="lesson-scroll-hint">Další lekce najdeš posunutím řádku do strany →</p>`}
     function changeLesson(l){if(l!=='all'&&!LESSONS.some(x=>String(x.number)===l))return;selectedLesson=l;WORDS=l==='all'?ALL_WORDS:LESSONS[Number(l)-1].words;state.selectedLesson=l;session=null;mode='due';query='';wordFilter='all';persist();render()}
     function statsHtml(){const c=counts();return `<section class="stats" aria-label="Přehled pokroku">
       <div class="stat good"><span class="number">${c.mastered}<span style="font-size:17px;color:#629782">/${WORDS.length}</span></span><span class="label">Zvládnutých slovíček</span></div>
@@ -145,8 +148,8 @@
     </div>`}
     function home(){if(session)return sessionHtml();const t=today();const c=counts();return `${commonHeader()}
       <div class="hero"><div><h1>¡Hola! Tak jdeme na to.</h1><p class="lead">${WORDS.length} slovíček ${selectedLesson==='all'?'z dosud zadaných lekcí':'z lekce '+selectedLesson}. Krátká pravidelná opakování pomohou zapamatovat si i to, co se napoprvé nepovede.</p></div><div class="illustration" aria-hidden="true"><div class="big">¡</div><div class="small">✦</div></div></div>
-      ${lessonPicker()}${selectedLesson==='4'||selectedLesson==='all'?'<div class="lesson-banner">Poznámka: lekce 4 zatím obsahuje pouze první část slovníčku z fotografie. Pokračování přidáme podle další stránky.</div>':''}
-      ${statsHtml()}<div class="layout"><section class="panel"><div class="panel-heading"><div><h2>Začít procvičování</h2><p class="subtle">Vyberte směr a okruh slovíček.</p></div><span class="pill">${selectedLesson==='all'?'Lekce 1–4':'Lekce '+selectedLesson}</span></div>
+      ${lessonPicker()}
+      ${statsHtml()}<div class="layout"><section class="panel"><div class="panel-heading"><div><h2>Začít procvičování</h2><p class="subtle">Vyberte směr a okruh slovíček.</p></div><span class="pill">${selectedLesson==='all'?'Lekce 1–7':'Lekce '+selectedLesson}</span></div>
       ${selectorHtml()}${modeHtml()}<button class="btn btn-primary btn-block" id="start">Začít s kartičkami <span aria-hidden="true">→</span></button>
       <div class="tip"><span aria-hidden="true">✳</span><span>Kartičku otočíte kliknutím. Poté označíte, zda jste odpověď <b>věděli</b>. Těžší slovíčka se budou vracet častěji.</span></div><div class="audio-help"><button class="btn btn-outline" id="voice-test" type="button">♫ Vyzkoušet španělskou výslovnost</button><p class="subtle">Výslovnost čte hlas zařízení. Pokud nic neslyšíte, zkontrolujte hlasitost a v nastavení přidejte španělský hlas.</p><p class="audio-status" id="audio-status" aria-live="polite"></p></div></section>
       <aside><section class="panel"><h3>Dnešní cíl</h3><div class="goal-top"><strong>${Math.min(t.attempts,GOAL)} / ${GOAL}</strong><span>odpovědí</span></div><div class="progress-track"><div class="progress-fill" style="width:${Math.min(100,t.attempts/GOAL*100)}%"></div></div>
@@ -212,7 +215,22 @@
     function vocabRows(ws){return ws.length?ws.map(w=>{const s=cardStatus(w);const c=rawCard(w);const names={new:'Nové',learning:'Učím se',mastered:'Zvládnuté'};return `<div class="vocab-row"><div class="vocab-word" lang="es">${html(w.es)}<small>${c.seen?`Úspěšně ${c.right||0}×`:'Zatím neprocvičeno'}</small></div><div class="vocab-trans">${html(w.cs)}</div><span class="status ${s}">${names[s]}</span><button class="row-btn" data-single="${w.id}" type="button" aria-label="Procvičit ${html(w.es)}">Procvičit</button></div>`}).join(''):'<div class="panel"><p class="subtle">Žádná odpovídající slovíčka.</p></div>'}
     function exportData(){const b=new Blob([JSON.stringify({type:'spanelstina-hola-progress',exportedAt:new Date().toISOString(),data:state},null,2)],{type:'application/json;charset=utf-8'});const url=URL.createObjectURL(b);const a=document.createElement('a');a.href=url;a.download='spanelstina-lekce1-pokrok-'+getLocalDay()+'.json';document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),3000);showToast('Záloha byla připravena ke stažení.')}
     async function importData(file){if(!file)return;try{if(file.size>2_000_000)throw Error('Soubor je příliš velký.');const raw=JSON.parse(await file.text());if(raw?.type!=='spanelstina-hola-progress'||!raw.data||raw.data.version!==1||!raw.data.cards||!raw.data.daily)throw Error('Tohle není platná záloha této aplikace.');if(!confirm('Načíst zálohu a přepsat současný pokrok v tomto prohlížeči?'))return;state=parseState(JSON.stringify(raw.data));persist();render();showToast('Pokrok byl obnoven ze zálohy.')}catch(e){showToast(e.message||'Zálohu se nepodařilo načíst.')}}
-    function render(){document.querySelectorAll('nav [data-tab]').forEach(b=>{if(b.dataset.tab===tab)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current')});root.innerHTML=tab==='progress'?progress():tab==='words'?vocab():home()}
+    function render(){
+      document.querySelectorAll('nav [data-tab]').forEach(b=>{if(b.dataset.tab===tab)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current')});
+      const previous=root.querySelector?.('.lesson-picker')?.scrollLeft||0;
+      root.innerHTML=tab==='progress'?progress():tab==='words'?vocab():home();
+      const picker=root.querySelector?.('.lesson-picker');
+      if(picker){
+        picker.scrollLeft=previous;
+        const active=picker.querySelector('.lesson-chip.active');
+        if(active){
+          const x=active.offsetLeft-picker.offsetLeft;
+          if(x<picker.scrollLeft || x+active.offsetWidth>picker.scrollLeft+picker.clientWidth){
+            picker.scrollLeft=Math.max(0,x-(picker.clientWidth-active.offsetWidth)/2);
+          }
+        }
+      }
+    }
     document.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;
       if(b.dataset.tab){nav(b.dataset.tab);return}
       if(b.dataset.lesson){changeLesson(b.dataset.lesson);return}
