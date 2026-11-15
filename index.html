@@ -26,6 +26,27 @@
     @media(max-width:840px){.layout,.progress-layout{grid-template-columns:1fr}.hero{margin-bottom:24px}.illustration{width:145px;height:145px}.illustration .big{width:112px;height:100px;font-size:46px;left:10px;top:7px}.illustration .small{width:60px;height:57px;font-size:26px}.stats{gap:9px}.stat{padding:17px 12px}.vocab-row{grid-template-columns:1fr 1fr auto}.vocab-row .status{grid-column:1 / 2;justify-self:start}.vocab-row .row-btn{grid-column:3;grid-row:1 / 3}}
     @media(max-width:570px){.wrap{padding:0 17px}.header-inner{min-height:70px;align-items:center;gap:8px}.brand{font-size:17px;gap:7px}.brand-mark{width:31px;height:31px;font-size:20px}.brand small{font-size:9px}nav{gap:0}nav button{padding:9px 7px;font-size:12px}.main{padding-top:27px}.illustration{display:none}.stats{grid-template-columns:repeat(2,1fr);margin-bottom:16px}.stat .number{font-size:29px}h1{letter-spacing:-1.1px;font-size:36px}.lead{font-size:15px}.panel{padding:20px;border-radius:17px}.modes{grid-template-columns:1fr 1fr 1fr}.mode{font-size:11px;padding:8px 4px;min-height:66px}.mode.active{padding:7px 3px}.segment{font-size:11px;padding:13px 5px}.flashcard{height:300px;padding:20px}.flashcard .card-term{font-size:35px}.vocab-row{padding:14px 13px;gap:7px;grid-template-columns:1fr 1fr auto}.vocab-word{font-size:14px}.vocab-trans{font-size:12px}.vocab-row .row-btn{padding:8px}.section-head{align-items:flex-start}.session-progress{margin:0 5px}.keyboard{display:none}.review-row .btn{padding:14px 8px;font-size:12px}}
     @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}*{transition:none!important;animation:none!important}}
+
+    /* Responsive, accessible touch controls on iOS/Android. */
+    button{touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+    .audio-help{margin-top:14px;padding:14px 16px;border:1px solid #d8e8de;background:#f4faf6;border-radius:13px}
+    .audio-help .subtle{margin-top:8px}.audio-status{font-size:12px;color:var(--muted);min-height:18px;margin-top:8px;text-align:center}
+    .study-tools .sound{font-size:14px;padding:12px 17px;min-height:46px}
+    @media(max-width:570px){
+      .header-inner{min-height:64px;padding-top:env(safe-area-inset-top)}
+      nav button{min-height:44px}
+      .main{padding-top:20px;padding-bottom:calc(70px + env(safe-area-inset-bottom))}
+      .panel{padding:17px}
+      .stats{gap:8px}.stat{padding:12px 11px;border-radius:14px}.stat .number{font-size:27px}
+      .stat .label{font-size:11px;line-height:1.3;display:block}
+      .segment{font-size:12px;min-height:48px}.mode{min-height:60px}.btn{min-height:48px;white-space:normal}
+      .section-head h1{font-size:29px!important}
+      .flashcard{height:clamp(225px,38dvh,340px);min-height:225px;padding:20px 16px;border-radius:19px}
+      .flashcard .card-term{font-size:clamp(29px,8vw,40px);line-height:1.18}
+      .review-row .btn{min-height:60px}.toolbar .search{min-width:0;width:100%;flex:1 0 100%}
+      .session-finish{padding:25px 16px}.finish-grid{gap:25px}
+    }
+    @media(max-width:370px){.brand{font-size:15px}.brand small{font-size:8px}nav button{font-size:11px!important;padding:8px 5px!important}.flashcard .card-term{font-size:27px}}
   </style>
 </head>
 <body>
@@ -109,7 +130,7 @@
       <div class="hero"><div><h1>¡Hola! Tak jdeme na to.</h1><p class="lead">20 slovíček z první lekce španělštiny. Krátká pravidelná opakování pomohou zapamatovat si i to, co se napoprvé nepovede.</p></div><div class="illustration" aria-hidden="true"><div class="big">¡</div><div class="small">✦</div></div></div>
       ${statsHtml()}<div class="layout"><section class="panel"><div class="panel-heading"><div><h2>Začít procvičování</h2><p class="subtle">Vyberte směr a okruh slovíček.</p></div><span class="pill">Lekce 1</span></div>
       ${selectorHtml()}${modeHtml()}<button class="btn btn-primary btn-block" id="start">Začít s kartičkami <span aria-hidden="true">→</span></button>
-      <div class="tip"><span aria-hidden="true">✳</span><span>Kartičku otočíte kliknutím. Poté označíte, zda jste odpověď <b>věděli</b>. Těžší slovíčka se budou vracet častěji.</span></div></section>
+      <div class="tip"><span aria-hidden="true">✳</span><span>Kartičku otočíte kliknutím. Poté označíte, zda jste odpověď <b>věděli</b>. Těžší slovíčka se budou vracet častěji.</span></div><div class="audio-help"><button class="btn btn-outline" id="voice-test" type="button">♫ Vyzkoušet španělskou výslovnost</button><p class="subtle">Výslovnost čte hlas zařízení. Pokud nic neslyšíte, zkontrolujte hlasitost a v nastavení přidejte španělský hlas.</p><p class="audio-status" id="audio-status" aria-live="polite"></p></div></section>
       <aside><section class="panel"><h3>Dnešní cíl</h3><div class="goal-top"><strong>${Math.min(t.attempts,GOAL)} / ${GOAL}</strong><span>odpovědí</span></div><div class="progress-track"><div class="progress-fill" style="width:${Math.min(100,t.attempts/GOAL*100)}%"></div></div>
       <p class="subtle" style="margin-top:12px">${t.attempts>=GOAL?'Cíl splněn. Výborně!':'I pět minut opakování denně má smysl.'}</p>
       <div class="divider"></div><h3>Stav znalostí</h3><div class="goal-top"><strong>${Math.round(c.mastered/WORDS.length*100)} %</strong><span>zvládnuto</span></div><div class="progress-track"><div class="progress-fill" style="width:${c.mastered/WORDS.length*100}%"></div></div>
@@ -127,13 +148,37 @@
       <span class="card-hint">${session.revealed?'Zhodnoťte, zda jste odpověď znali':'Kliknutím otočíte kartičku'}</span></button>
       ${session.revealed?`<div class="review-row"><button id="miss" class="btn btn-danger" type="button">↺ Ještě neumím <span style="font-weight:500">[1]</span></button><button id="know" class="btn btn-primary" type="button">✓ Umím <span style="font-weight:500">[2]</span></button></div>`:`<button id="reveal" class="btn btn-primary btn-block" type="button">Ukázat odpověď</button>`}
       <div class="study-tools"><button type="button" class="sound" id="sound" ${!('speechSynthesis' in window)?'disabled':''}>♫ Přehrát španělsky</button></div>
-      <p class="keyboard">Klávesnice: mezerník = otočit, 1 = ještě neumím, 2 = umím</p></section>
+      <p class="audio-status" id="audio-status" role="status" aria-live="polite"></p><p class="keyboard">Klávesnice: mezerník = otočit, 1 = ještě neumím, 2 = umím</p></section>
       <p class="session-note">Odpovídejte nejprve zpaměti. Znalost hodnotíte vy sami.</p>`}
     function finishHtml(){return `<section class="panel session-finish" style="max-width:680px;margin:25px auto"><div class="medal" aria-hidden="true">✦</div><div class="eyebrow" style="justify-content:center">HOTOVO</div><h2>¡Muy bien!</h2><p>Procvičování dokončeno. Slovíčka, která zatím nejdou, se znovu objeví při dalším opakování.</p>
       <div class="finish-grid"><div><strong>${session.known}</strong><span>Správně</span></div><div><strong>${session.missed}</strong><span>K zopakování</span></div></div>
       <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap"><button id="restart" class="btn btn-primary">Procvičovat znovu</button><button data-tab="progress" class="btn btn-outline">Zobrazit pokrok</button></div></section>`}
     function rate(known){if(!session||session.done||!session.revealed)return;const id=session.queue[session.index];const k=id+'|'+session.direction;const previous=state.cards[k]||{level:0,streak:0,right:0,wrong:0,seen:0,due:0,last:0};const c={...previous};c.seen=(Number(c.seen)||0)+1;c.last=Date.now();if(known){c.right=(Number(c.right)||0)+1;c.streak=(Number(c.streak)||0)+1;c.level=Math.min(5,(Number(c.level)||0)+1);c.due=Date.now()+INTERVALS[c.level]*DAY;session.known++}else{c.wrong=(Number(c.wrong)||0)+1;c.streak=0;c.level=0;c.due=Date.now();session.missed++;session.seenInSession[id]=(session.seenInSession[id]||0)+1;if(session.seenInSession[id]<=1)session.queue.push(id)}state.cards[k]=c;const d=getLocalDay();state.daily[d]=state.daily[d]||{attempts:0,correct:0};state.daily[d].attempts++;if(known)state.daily[d].correct++;persist();session.index++;session.revealed=false;if(session.index>=session.queue.length)session.done=true;render()}
-    function speak(){if(!('speechSynthesis' in window)||!session||session.done)return;const w=WORDS.find(x=>x.id===session.queue[session.index]);if(!w)return;window.speechSynthesis.cancel();const speech=new SpeechSynthesisUtterance(w.es.replace('/a','').replace('¿','').replace('?',''));speech.lang='es-ES';speech.rate=.86;window.speechSynthesis.speak(speech)}
+    // Safari/iOS: choose an actual Spanish voice, retain utterance and surface playback errors.
+    let liveUtterance=null;
+    function spanishVoices(){if(!('speechSynthesis' in window))return [];return window.speechSynthesis.getVoices().filter(v=>/^es([_-]|$)/i.test(v.lang||''))}
+    function spokenText(input){return input.replace(/\/a\\b/g,'').replace(/[¿?¡!]/g,'').trim()}
+    function playSpanish(input){
+      if(!('speechSynthesis' in window)||!('SpeechSynthesisUtterance' in window)){showToast('Prohlížeč nepodporuje hlasové čtení.');return}
+      try{
+        const synth=window.speechSynthesis, voices=spanishVoices();
+        const voice=voices.find(v=>v.lang.toLowerCase()==='es-es'&&v.localService)||voices.find(v=>v.lang.toLowerCase()==='es-es')||voices[0];
+        if(synth.speaking||synth.pending)synth.cancel();
+        if(synth.paused)synth.resume();
+        const speech=new SpeechSynthesisUtterance(spokenText(input));
+        speech.lang=voice?.lang||'es-ES';if(voice)speech.voice=voice;
+        speech.rate=.88;speech.pitch=1;speech.volume=1;
+        liveUtterance=speech;
+        const status=()=>document.getElementById('audio-status');
+        speech.onstart=()=>{if(status())status().textContent='Přehrávání spuštěno'+(voice?' · '+voice.name:'')+'.'};
+        speech.onend=()=>{if(liveUtterance===speech)liveUtterance=null;if(status())status().textContent=''};
+        speech.onerror=e=>{if(liveUtterance===speech)liveUtterance=null;if(e.error!=='interrupted'&&e.error!=='canceled')showToast('Zvuk se nepodařilo přehrát ('+(e.error||'chyba')+'). Zkontrolujte hlasitost a španělský hlas v nastavení zařízení.')};
+        synth.speak(speech);
+        if(!voice)showToast('Systém nenabízí španělský hlas. Přidejte v nastavení hlas Español a zkuste to znovu.');
+      }catch(e){showToast('Chyba přehrávání: '+e.message)}
+    }
+    function speak(){if(!session||session.done)return;const w=WORDS.find(x=>x.id===session.queue[session.index]);if(w)playSpanish(w.es)}
+    if('speechSynthesis' in window)try{window.speechSynthesis.getVoices();window.speechSynthesis.addEventListener?.('voiceschanged',()=>window.speechSynthesis.getVoices())}catch(e){}
     function progress(){const c=counts();const t=today();const all=WORDS.map(rawCard);const successes=all.reduce((sum,x)=>sum+(Number(x.right)||0),0);const errors=all.reduce((sum,x)=>sum+(Number(x.wrong)||0),0);const pct=successes+errors?Math.round(successes/(successes+errors)*100):0;const days=Array.from({length:7},(_,i)=>{const x=new Date();x.setHours(12,0,0,0);x.setDate(x.getDate()-(6-i));return {date:getLocalDay(x),label:x.toLocaleDateString('cs-CZ',{weekday:'short'}),value:(state.daily[getLocalDay(x)]||{attempts:0}).attempts}});const max=Math.max(10,...days.map(x=>x.value));return `${commonHeader()}<div class="section-head"><div><h1>Tvůj pokrok</h1><p class="lead">Jak postupuje učení a co je právě potřeba zopakovat.</p></div></div>${statsHtml()}
       <div class="progress-layout"><section class="panel"><h2>Aktivita za posledních 7 dní</h2><p class="subtle">Počet vyhodnocených kartiček za den, oba směry překladu dohromady.</p><div class="bars">${days.map(x=>`<div class="barcol"><span class="bar-num">${x.value||''}</span><div class="bar-track"><div class="bar-fill" style="height:${x.value?Math.max(5,x.value/max*100):0}%"></div></div><span class="bar-day">${html(x.label)}</span></div>`).join('')}</div></section>
       <section class="panel"><h2>Znalosti</h2><p class="subtle">Aktuální směr: <strong>${dirLabel()}</strong></p>
@@ -155,7 +200,7 @@
       if(b.dataset.dir){state.direction=b.dataset.dir;persist();render();return}
       if(b.dataset.mode){mode=b.dataset.mode;render();return}
       if(b.dataset.single){startSession('custom',[b.dataset.single]);return}
-      switch(b.id){case 'start':startSession();break;case 'flashcard':case 'reveal':if(session&&!session.revealed){session.revealed=true;render()}break;case 'miss':rate(false);break;case 'know':rate(true);break;case 'sound':speak();break;case 'end':session=null;render();break;case 'restart':session=null;startSession('all');break;case 'export':exportData();break;case 'import':document.getElementById('import-file')?.click();break;case 'reset':if(confirm('Opravdu chcete vymazat veškerý pokrok v této aplikaci? Tuto akci nelze vrátit.')){state=deepCopy(INITIAL);persist();render();showToast('Pokrok byl vymazán.')}break;}
+      switch(b.id){case 'start':startSession();break;case 'flashcard':case 'reveal':if(session&&!session.revealed){session.revealed=true;render()}break;case 'miss':rate(false);break;case 'know':rate(true);break;case 'sound':speak();break;case 'voice-test':playSpanish('Hola. Buenos días. ¿Cómo estás?');break;case 'end':session=null;render();break;case 'restart':session=null;startSession('all');break;case 'export':exportData();break;case 'import':document.getElementById('import-file')?.click();break;case 'reset':if(confirm('Opravdu chcete vymazat veškerý pokrok v této aplikaci? Tuto akci nelze vrátit.')){state=deepCopy(INITIAL);persist();render();showToast('Pokrok byl vymazán.')}break;}
     });
     document.addEventListener('input',e=>{if(e.target.id==='search'){query=e.target.value;const q=query.trim().toLocaleLowerCase('cs-CZ');const ws=WORDS.filter(w=>(!q||(w.es+' '+w.cs).toLocaleLowerCase('cs-CZ').includes(q))&&(wordFilter==='all'||cardStatus(w)===wordFilter));document.getElementById('vocab-rows').innerHTML=vocabRows(ws)}});
     document.addEventListener('change',e=>{if(e.target.id==='status-filter'){wordFilter=e.target.value;render();document.getElementById('search')?.focus()}if(e.target.id==='import-file'){importData(e.target.files[0]);e.target.value=''}});
