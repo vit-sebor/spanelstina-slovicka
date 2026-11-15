@@ -394,6 +394,21 @@ window.addEventListener('beforeunload',e=>{if(dialogDirty||pendingState){e.preve
 $('exportIcon').innerHTML=icon('download');$('importIcon').innerHTML=icon('upload');$('printIcon').innerHTML=icon('print');
 renderNav();loadState();
 </script>
+<script>// Exact destination is inserted by the build after the shared site is deployed.
+(()=>{
+ const destination="https://sofie-skola-prehled.heroicbrownie1.chatgpt.site";
+ const params=new URLSearchParams(location.search),nonce=params.get('nonce')||'';
+ if(params.get('transfer')!=='shared'||!window.opener||!/^[a-f0-9-]{36}$/.test(nonce))return;
+ const timer=setInterval(()=>{
+  if(!state)return;clearInterval(timer);
+  $('globalBanner').innerHTML='<div class="banner"><strong>Převod do společného přehledu</strong><p>'+(state.subjects.length?'Předají se zde uložené úkoly, poznámky, známky a historie. Původní kopie zůstane zachovaná.':'V tomto prohlížeči nejsou načtené žádné údaje. Otevřete převod ve stejném prohlížeči, ve kterém přehled používáte.')+'</p>'+(state.subjects.length?'<button class="button primary" id="sendSharedTransfer" style="margin-top:12px">Přenést do společného přehledu</button>':'')+'</div>';
+ },100);
+ document.addEventListener('click',event=>{if(!event.target.closest('#sendSharedTransfer'))return;if(!state?.subjects.length||!validState(state)){showToast('Údaje nelze bezpečně předat.');return;}
+  window.opener.postMessage({type:'school-migration',nonce,state:clone(state)},destination);
+  $('globalBanner').innerHTML='<div class="banner">Údaje byly předány. Převod potvrďte v okně společného přehledu.</div>';window.close();
+ });
+})();
+</script>
 </body>
 </html>
 
