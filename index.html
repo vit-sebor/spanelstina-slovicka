@@ -4,10 +4,10 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#f7f8f4">
-  <meta name="description" content="Interaktivní kartičky pro španělštinu – první lekce. Procvičování, opakování a sledování pokroku.">
+  <meta name="description" content="Interaktivní španělské kartičky – lekce 1 až 4. Chytré opakování, výslovnost a sledování pokroku.">
   <link rel="icon" href="icon.svg" type="image/svg+xml">
   <link rel="manifest" href="manifest.webmanifest">
-  <title>¡Hola! | Španělština – lekce 1</title>
+  <title>¡Hola! | Španělština – slovíčka (lekce 1–4)</title>
   <style>
     :root{--bg:#f7f8f4;--paper:#ffffff;--ink:#162d29;--muted:#64736f;--line:#dde7e1;--green:#16765f;--green-deep:#0c5b48;--mint:#e0f3e7;--cream:#fff6e5;--orange:#c66a34;--pale:#f1f5f2;--shadow:0 14px 40px rgba(29,66,51,.07)}
     *{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:radial-gradient(circle at 80% 1%,#eaf5ec 0,transparent 34%),var(--bg);font:16px/1.48 -apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;color:var(--ink);min-height:100vh}
@@ -47,11 +47,18 @@
       .session-finish{padding:25px 16px}.finish-grid{gap:25px}
     }
     @media(max-width:370px){.brand{font-size:15px}.brand small{font-size:8px}nav button{font-size:11px!important;padding:8px 5px!important}.flashcard .card-term{font-size:27px}}
+
+    .lesson-picker{display:flex;gap:9px;overflow-x:auto;scroll-snap-type:x proximity;scrollbar-width:thin;padding:4px 2px 14px;margin:5px 0 16px}
+    .lesson-chip{flex:0 0 auto;scroll-snap-align:start;min-height:55px;padding:9px 16px;border:1px solid var(--line);border-radius:14px;background:white;color:var(--ink);font-size:14px;font-weight:800;white-space:nowrap}
+    .lesson-chip.active{border-color:#68ae92;background:#e5f3e9;color:var(--green-deep)}
+    .lesson-chip small{font-size:11px;font-weight:600;color:#64736f;display:block;margin-top:3px}
+    .lesson-banner{font-size:13px;color:#765829;background:var(--cream);border:1px solid #eadbb9;border-radius:12px;padding:11px 13px;margin:1px 0 18px}
+    @media(max-width:570px){.lesson-picker{margin-right:-17px;padding-right:17px}.vocab-row{grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:7px}.vocab-row .status{grid-column:1;grid-row:2;justify-self:start}.vocab-row .row-btn{grid-column:2;grid-row:2;justify-self:end;min-height:44px}.vocab-word,.vocab-trans{overflow-wrap:anywhere}}
   </style>
 </head>
 <body>
   <header class="site-header"><div class="wrap header-inner">
-    <div class="brand"><div class="brand-mark"><span>¡</span></div><div>Hola!<small>Španělština • Lekce 1</small></div></div>
+    <div class="brand"><div class="brand-mark"><span>¡</span></div><div>Hola!<small>Španělština • Lekce 1–4</small></div></div>
     <nav aria-label="Hlavní navigace">
       <button type="button" data-tab="home" aria-current="page">Učit se</button>
       <button type="button" data-tab="progress">Pokrok</button>
@@ -60,10 +67,11 @@
   </div></header>
   <main id="app" class="wrap main" tabindex="-1"></main>
   <div id="toast" role="status" aria-live="polite" class="toast"></div>
+  <script src="./words-extra.js"></script>
   <script>
     'use strict';
     // Údaje jsou přepsány z fotografie slovníčku první lekce.
-    const WORDS = [
+    const LESSON1 = [
       {id:'como-estas',es:'¿Cómo estás?',cs:'Jak se máš?'},
       {id:'que-tal',es:'¿Qué tal?',cs:'Jak se vede?'},
       {id:'adios',es:'adiós',cs:'sbohem, na shledanou'},
@@ -85,6 +93,10 @@
       {id:'llamarse',es:'llamarse',cs:'jmenovat se'},
       {id:'ser',es:'ser',cs:'být'}
     ];
+    LESSON1.forEach(w=>w.lesson=1);
+    const LESSONS=[{number:1,title:'Hola, ¿qué tal?',partial:false,words:LESSON1},...(window.SPANISH_EXTRA_LESSONS||[])];
+    const ALL_WORDS=LESSONS.flatMap(l=>l.words);
+    let selectedLesson='1', WORDS=LESSON1;
     const KEY = 'spanelstina-hola-lekce-1-progress-v1';
     const INTERVALS = [0,1,3,7,14,30];
     const DAY = 86400000;
@@ -97,6 +109,8 @@
     let canSave=true;
     let state;
     try {const saved=localStorage.getItem(KEY);state=saved?parseState(saved):deepCopy(INITIAL);localStorage.setItem(KEY,JSON.stringify(state))} catch(e) {state=deepCopy(INITIAL);canSave=false}
+    selectedLesson=['1','2','3','4','all'].includes(String(state.selectedLesson))?String(state.selectedLesson):'1';
+    WORDS=selectedLesson==='all'?ALL_WORDS:LESSONS[Number(selectedLesson)-1].words;
     let tab='home',mode='due',session=null,query='',wordFilter='all';
     const root=document.getElementById('app');
     function persist(){try{localStorage.setItem(KEY,JSON.stringify(state));canSave=true}catch(e){canSave=false;showToast('Prohlížeč nyní neumožňuje uložit data. Použijte export zálohy.')}}
@@ -110,7 +124,10 @@
     function shuffle(arr){const a=[...arr];for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
     function dirLabel(){return state.direction==='cs-es'?'Česky → španělsky':'Španělsky → česky'}
     function nav(t){tab=t;session=null;query='';wordFilter='all';window.scrollTo({top:0,behavior:'smooth'});render()}
-    function commonHeader(){return `<div class="eyebrow">LECCIÓN 1 · HOLA, ¿QUÉ TAL?</div>`}
+    function currentLabel(){return selectedLesson==='all'?'LEKCE 1–4 · VŠECHNA SLOVÍČKA':'LECCIÓN '+selectedLesson+' · '+LESSONS[Number(selectedLesson)-1].title.toLocaleUpperCase('es-ES')}
+    function commonHeader(){return `<div class="eyebrow">${html(currentLabel())}</div>`}
+    function lessonPicker(){return `<div class="lesson-picker" role="group" aria-label="Vybrat lekci">${LESSONS.map(l=>`<button type="button" class="lesson-chip ${selectedLesson===String(l.number)?'active':''}" data-lesson="${l.number}" aria-pressed="${selectedLesson===String(l.number)}">Lekce ${l.number}<small>${l.words.length} slov${l.partial?' · část':''}</small></button>`).join('')}<button type="button" class="lesson-chip ${selectedLesson==='all'?'active':''}" data-lesson="all" aria-pressed="${selectedLesson==='all'}">Všechny lekce<small>${ALL_WORDS.length} slov</small></button></div>`}
+    function changeLesson(l){if(!['1','2','3','4','all'].includes(l))return;selectedLesson=l;WORDS=l==='all'?ALL_WORDS:LESSONS[Number(l)-1].words;state.selectedLesson=l;session=null;mode='due';query='';wordFilter='all';persist();render()}
     function statsHtml(){const c=counts();return `<section class="stats" aria-label="Přehled pokroku">
       <div class="stat good"><span class="number">${c.mastered}<span style="font-size:17px;color:#629782">/${WORDS.length}</span></span><span class="label">Zvládnutých slovíček</span></div>
       <div class="stat"><span class="number">${c.learning}</span><span class="label">Právě se učím</span></div>
@@ -127,8 +144,9 @@
       <button type="button" class="mode ${mode==='hard'?'active':''}" data-mode="hard" aria-pressed="${mode==='hard'}">Obtížná<span>${WORDS.filter(w=>rawCard(w).wrong>0).length} slov</span></button>
     </div>`}
     function home(){if(session)return sessionHtml();const t=today();const c=counts();return `${commonHeader()}
-      <div class="hero"><div><h1>¡Hola! Tak jdeme na to.</h1><p class="lead">20 slovíček z první lekce španělštiny. Krátká pravidelná opakování pomohou zapamatovat si i to, co se napoprvé nepovede.</p></div><div class="illustration" aria-hidden="true"><div class="big">¡</div><div class="small">✦</div></div></div>
-      ${statsHtml()}<div class="layout"><section class="panel"><div class="panel-heading"><div><h2>Začít procvičování</h2><p class="subtle">Vyberte směr a okruh slovíček.</p></div><span class="pill">Lekce 1</span></div>
+      <div class="hero"><div><h1>¡Hola! Tak jdeme na to.</h1><p class="lead">${WORDS.length} slovíček ${selectedLesson==='all'?'z dosud zadaných lekcí':'z lekce '+selectedLesson}. Krátká pravidelná opakování pomohou zapamatovat si i to, co se napoprvé nepovede.</p></div><div class="illustration" aria-hidden="true"><div class="big">¡</div><div class="small">✦</div></div></div>
+      ${lessonPicker()}${selectedLesson==='4'||selectedLesson==='all'?'<div class="lesson-banner">Poznámka: lekce 4 zatím obsahuje pouze první část slovníčku z fotografie. Pokračování přidáme podle další stránky.</div>':''}
+      ${statsHtml()}<div class="layout"><section class="panel"><div class="panel-heading"><div><h2>Začít procvičování</h2><p class="subtle">Vyberte směr a okruh slovíček.</p></div><span class="pill">${selectedLesson==='all'?'Lekce 1–4':'Lekce '+selectedLesson}</span></div>
       ${selectorHtml()}${modeHtml()}<button class="btn btn-primary btn-block" id="start">Začít s kartičkami <span aria-hidden="true">→</span></button>
       <div class="tip"><span aria-hidden="true">✳</span><span>Kartičku otočíte kliknutím. Poté označíte, zda jste odpověď <b>věděli</b>. Těžší slovíčka se budou vracet častěji.</span></div><div class="audio-help"><button class="btn btn-outline" id="voice-test" type="button">♫ Vyzkoušet španělskou výslovnost</button><p class="subtle">Výslovnost čte hlas zařízení. Pokud nic neslyšíte, zkontrolujte hlasitost a v nastavení přidejte španělský hlas.</p><p class="audio-status" id="audio-status" aria-live="polite"></p></div></section>
       <aside><section class="panel"><h3>Dnešní cíl</h3><div class="goal-top"><strong>${Math.min(t.attempts,GOAL)} / ${GOAL}</strong><span>odpovědí</span></div><div class="progress-track"><div class="progress-fill" style="width:${Math.min(100,t.attempts/GOAL*100)}%"></div></div>
@@ -141,7 +159,7 @@
     function sessionHtml(){if(session.done)return finishHtml();const word=WORDS.find(w=>w.id===session.queue[session.index]);if(!word){session.done=true;return finishHtml()}const forward=session.direction==='cs-es';const source=forward?word.cs:word.es;const target=forward?word.es:word.cs;
       return `<div class="section-head"><div>${commonHeader()}<h1 style="font-size:clamp(27px,4vw,38px)">Procvičujeme</h1><p class="subtle">${forward?'Z češtiny do španělštiny':'Ze španělštiny do češtiny'}</p></div><button type="button" class="text-btn" id="end">Ukončit lekci</button></div>
       <section class="panel" style="max-width:720px;margin:auto"><div class="session-head"><span class="session-count">Kartička ${session.index+1} z ${session.queue.length}</span><div class="session-progress"><span style="width:${session.index/session.queue.length*100}%"></span></div><span class="pill">${session.known} umím</span></div>
-      <p class="session-caption">${session.revealed?'Správná odpověď':'Jak byste to přeložili?'}</p>
+      <p class="session-caption">${selectedLesson==='all'?'Lekce '+word.lesson+' · ':''}${session.revealed?'Správná odpověď':'Jak byste to přeložili?'}</p>
       <button id="flashcard" type="button" class="flashcard ${session.revealed?'revealed':''}" aria-label="${session.revealed?'Správná odpověď: '+html(target):'Přeložte: '+html(source)+'. Kliknutím zobrazit odpověď.'}">
       <span class="card-type">${session.revealed?(forward?'Español':'Česky'):(forward?'Česky':'Español')}</span>
       <span class="card-term">${html(session.revealed?target:source)}</span>
@@ -179,7 +197,7 @@
     }
     function speak(){if(!session||session.done)return;const w=WORDS.find(x=>x.id===session.queue[session.index]);if(w)playSpanish(w.es)}
     if('speechSynthesis' in window)try{window.speechSynthesis.getVoices();window.speechSynthesis.addEventListener?.('voiceschanged',()=>window.speechSynthesis.getVoices())}catch(e){}
-    function progress(){const c=counts();const t=today();const all=WORDS.map(rawCard);const successes=all.reduce((sum,x)=>sum+(Number(x.right)||0),0);const errors=all.reduce((sum,x)=>sum+(Number(x.wrong)||0),0);const pct=successes+errors?Math.round(successes/(successes+errors)*100):0;const days=Array.from({length:7},(_,i)=>{const x=new Date();x.setHours(12,0,0,0);x.setDate(x.getDate()-(6-i));return {date:getLocalDay(x),label:x.toLocaleDateString('cs-CZ',{weekday:'short'}),value:(state.daily[getLocalDay(x)]||{attempts:0}).attempts}});const max=Math.max(10,...days.map(x=>x.value));return `${commonHeader()}<div class="section-head"><div><h1>Tvůj pokrok</h1><p class="lead">Jak postupuje učení a co je právě potřeba zopakovat.</p></div></div>${statsHtml()}
+    function progress(){const c=counts();const t=today();const all=WORDS.map(rawCard);const successes=all.reduce((sum,x)=>sum+(Number(x.right)||0),0);const errors=all.reduce((sum,x)=>sum+(Number(x.wrong)||0),0);const pct=successes+errors?Math.round(successes/(successes+errors)*100):0;const days=Array.from({length:7},(_,i)=>{const x=new Date();x.setHours(12,0,0,0);x.setDate(x.getDate()-(6-i));return {date:getLocalDay(x),label:x.toLocaleDateString('cs-CZ',{weekday:'short'}),value:(state.daily[getLocalDay(x)]||{attempts:0}).attempts}});const max=Math.max(10,...days.map(x=>x.value));return `${commonHeader()}<div class="section-head"><div><h1>Tvůj pokrok</h1><p class="lead">Jak postupuje učení a co je právě potřeba zopakovat.</p></div></div>${lessonPicker()}${statsHtml()}
       <div class="progress-layout"><section class="panel"><h2>Aktivita za posledních 7 dní</h2><p class="subtle">Počet vyhodnocených kartiček za den, oba směry překladu dohromady.</p><div class="bars">${days.map(x=>`<div class="barcol"><span class="bar-num">${x.value||''}</span><div class="bar-track"><div class="bar-fill" style="height:${x.value?Math.max(5,x.value/max*100):0}%"></div></div><span class="bar-day">${html(x.label)}</span></div>`).join('')}</div></section>
       <section class="panel"><h2>Znalosti</h2><p class="subtle">Aktuální směr: <strong>${dirLabel()}</strong></p>
       <div class="meter-line"><div class="top"><span>Zvládnutá slovíčka</span><span>${c.mastered} / ${WORDS.length}</span></div><div class="progress-track"><div class="progress-fill" style="width:${c.mastered/WORDS.length*100}%"></div></div></div>
@@ -188,8 +206,8 @@
       <div class="divider"></div>${selectorHtml()}</section></div>
       <section class="panel" style="margin-top:19px"><h2>Uložení a záloha</h2><p class="subtle">Pokrok se ukládá automaticky pouze v tomto prohlížeči na tomto zařízení. Nesynchronizuje se mezi počítačem a telefonem. Při anonymním prohlížení nebo vymazání dat webu se může ztratit. Můžete si ho stáhnout a později znovu načíst.</p>
       <div class="settings-actions"><button id="export" class="btn btn-secondary" type="button">↓ Stáhnout zálohu</button><button id="import" class="btn btn-outline" type="button">↑ Načíst zálohu</button><button id="reset" class="btn btn-outline" type="button">Vymazat pokrok</button><input type="file" id="import-file" class="file-input" accept=".json,application/json"></div>${!canSave?'<div class="warning">Pozor: tento prohlížeč nyní nedovoluje trvalé uložení dat. Stáhněte si zálohu.</div>':''}</section>`}
-    function vocab(){const c=counts();const q=query.trim().toLocaleLowerCase('cs-CZ');const ws=WORDS.filter(w=>(!q||(w.es+' '+w.cs).toLocaleLowerCase('cs-CZ').includes(q))&&(wordFilter==='all'||cardStatus(w)===wordFilter));return `${commonHeader()}<div class="section-head"><div><h1>Slovníček</h1><p class="lead">Všech ${WORDS.length} slovíček z fotografie učebnice. Stav se zobrazuje pro směr ${dirLabel().toLocaleLowerCase('cs-CZ')}.</p></div></div>
-      <div class="toolbar"><input id="search" class="search" type="search" autocomplete="off" placeholder="Hledat španělsky nebo česky..." value="${html(query)}" aria-label="Hledat slovíčko"><select id="status-filter" class="search" style="flex:0 1 190px" aria-label="Filtrovat podle stavu"><option value="all" ${wordFilter==='all'?'selected':''}>Všechna (${WORDS.length})</option><option value="new" ${wordFilter==='new'?'selected':''}>Nová (${c.newCount})</option><option value="learning" ${wordFilter==='learning'?'selected':''}>V učení (${c.learning})</option><option value="mastered" ${wordFilter==='mastered'?'selected':''}>Zvládnutá (${c.mastered})</option></select></div>
+    function vocab(){const c=counts();const q=query.trim().toLocaleLowerCase('cs-CZ');const ws=WORDS.filter(w=>(!q||(w.es+' '+w.cs).toLocaleLowerCase('cs-CZ').includes(q))&&(wordFilter==='all'||cardStatus(w)===wordFilter));return `${commonHeader()}<div class="section-head"><div><h1>Slovníček</h1><p class="lead">${WORDS.length} slovíček z fotografie učebnice. Stav se zobrazuje pro vybraný okruh a směr ${dirLabel().toLocaleLowerCase('cs-CZ')}.</p></div></div>
+      ${lessonPicker()}<div class="toolbar"><input id="search" class="search" type="search" autocomplete="off" placeholder="Hledat španělsky nebo česky..." value="${html(query)}" aria-label="Hledat slovíčko"><select id="status-filter" class="search" style="flex:0 1 190px" aria-label="Filtrovat podle stavu"><option value="all" ${wordFilter==='all'?'selected':''}>Všechna (${WORDS.length})</option><option value="new" ${wordFilter==='new'?'selected':''}>Nová (${c.newCount})</option><option value="learning" ${wordFilter==='learning'?'selected':''}>V učení (${c.learning})</option><option value="mastered" ${wordFilter==='mastered'?'selected':''}>Zvládnutá (${c.mastered})</option></select></div>
       <div id="vocab-rows" class="vocab">${vocabRows(ws)}</div><p class="footer">Překlady vycházejí ze slovníčku na dodané fotografii.</p>`}
     function vocabRows(ws){return ws.length?ws.map(w=>{const s=cardStatus(w);const c=rawCard(w);const names={new:'Nové',learning:'Učím se',mastered:'Zvládnuté'};return `<div class="vocab-row"><div class="vocab-word" lang="es">${html(w.es)}<small>${c.seen?`Úspěšně ${c.right||0}×`:'Zatím neprocvičeno'}</small></div><div class="vocab-trans">${html(w.cs)}</div><span class="status ${s}">${names[s]}</span><button class="row-btn" data-single="${w.id}" type="button" aria-label="Procvičit ${html(w.es)}">Procvičit</button></div>`}).join(''):'<div class="panel"><p class="subtle">Žádná odpovídající slovíčka.</p></div>'}
     function exportData(){const b=new Blob([JSON.stringify({type:'spanelstina-hola-progress',exportedAt:new Date().toISOString(),data:state},null,2)],{type:'application/json;charset=utf-8'});const url=URL.createObjectURL(b);const a=document.createElement('a');a.href=url;a.download='spanelstina-lekce1-pokrok-'+getLocalDay()+'.json';document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),3000);showToast('Záloha byla připravena ke stažení.')}
@@ -197,6 +215,7 @@
     function render(){document.querySelectorAll('nav [data-tab]').forEach(b=>{if(b.dataset.tab===tab)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current')});root.innerHTML=tab==='progress'?progress():tab==='words'?vocab():home()}
     document.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;
       if(b.dataset.tab){nav(b.dataset.tab);return}
+      if(b.dataset.lesson){changeLesson(b.dataset.lesson);return}
       if(b.dataset.dir){state.direction=b.dataset.dir;persist();render();return}
       if(b.dataset.mode){mode=b.dataset.mode;render();return}
       if(b.dataset.single){startSession('custom',[b.dataset.single]);return}
