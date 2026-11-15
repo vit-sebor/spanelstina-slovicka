@@ -2,6 +2,7 @@
 <html lang="cs">
 <head>
 <meta charset="utf-8">
+<meta name="school-features" content="incremental-update,subject-teacher">
 <meta name="robots" content="noindex,nofollow">
 <meta name="referrer" content="no-referrer">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; connect-src 'none'; base-uri 'none'; form-action 'none'; object-src 'none'">
@@ -39,7 +40,7 @@ function validateState(s){
 function validate(s){
  const error=validateState(s);if(error)return error;
  if(!s.source||typeof s.source.label!=='string'||typeof s.source.asOf!=='string')return 'Chybí zdroj dat.';
- for(const sub of s.subjects){if(sub.evidence.some(e=>!e||typeof e.title!=='string')||typeof sub.summary!=='string')return 'Neplatné podklady předmětu.';}
+ for(const sub of s.subjects){if(sub.evidence.some(e=>!e||typeof e.title!=='string')||typeof sub.summary!=='string')return 'Neplatné podklady předmětu.';if(sub.teacher!==undefined&&(typeof sub.teacher!=='string'||sub.teacher.length>160))return 'Neplatné jméno vyučujícího.';}
  for(const t of s.tasks){if(!Array.isArray(t.relatedIds)||t.relatedIds.some(id=>typeof id!=='string'))return 'Neplatné související úkoly.';}
  if(s.history.some(h=>!h||typeof h.date!=='string'||typeof h.label!=='string'))return 'Neplatná historie změn.';
  if(s.appliedUpdates!==undefined&&(!Array.isArray(s.appliedUpdates)||s.appliedUpdates.some(id=>typeof id!=='string')))return 'Neplatný seznam aktualizací.';
@@ -144,10 +145,23 @@ function mergeSchoolUpdate(current, update){
  }
  for(const change of update.subjectUpdates){
   const s=subject(change.id);
-  if(!text(change.summary)||!Array.isArray(change.evidence))fail('Neplatná aktualizace předmětu.');
-  s.previousSourceSummaries=[...(s.previousSourceSummaries||[]),{date:update.date,text:s.summary}];
-  s.summary=change.summary;s.evidence.push(...copy(change.evidence));
-  changes.push({kind:'subject',label:s.name});
+  if(change.teacher===undefined&&change.summary===undefined&&change.evidence===undefined)fail('Prázdná aktualizace předmětu.');
+  if(change.teacher!==undefined){
+   if(!text(change.teacher)||change.teacher.length>160)fail('Neplatné jméno vyučujícího.');
+   s.teacher=change.teacher;
+   s.teacherSource={label:update.title,date:update.date};
+   changes.push({kind:'teacher',label:s.name+' – '+s.teacher});
+  }
+  if(change.summary!==undefined){
+   if(!text(change.summary))fail('Neplatná aktualizace předmětu.');
+   s.previousSourceSummaries=[...(s.previousSourceSummaries||[]),{date:update.date,text:s.summary}];
+   s.summary=change.summary;
+  }
+  if(change.evidence!==undefined){
+   if(!Array.isArray(change.evidence))fail('Neplatné podklady předmětu.');
+   s.evidence.push(...copy(change.evidence));
+  }
+  if(change.summary!==undefined||change.evidence!==undefined)changes.push({kind:'subject',label:s.name});
  }
  candidate.appliedUpdates=[...(candidate.appliedUpdates||[]),update.id];
  candidate.source.latestUpdate=update.date;
@@ -165,7 +179,7 @@ function prepareSourceUpdate(data){
  if(result.alreadyApplied){showToast('Tato aktualizace už je načtená. Žádné položky se nezdvojily.');return;}
  if(!validState(result.state))throw new Error('Výsledná aktualizace nemá platná data. Nic nebylo změněno.');
  updateCandidate=result.state;
- const items=result.changes.map(x=>'<li style="margin:8px 0"><strong>'+esc({new:'Nový úkol',update:'Upřesnění úkolu',subject:'Podklad předmětu'}[x.kind])+':</strong> '+esc(x.label)+'</li>').join('');
+ const items=result.changes.map(x=>'<li style="margin:8px 0"><strong>'+esc({new:'Nový úkol',update:'Upřesnění úkolu',subject:'Podklad předmětu',teacher:'Vyučující'}[x.kind])+':</strong> '+esc(x.label)+'</li>').join('');
  openModal('<form id="updateForm">'+modalHead('Doplnění z EduPage','Přidat nové informace')+'<div class="modal-body"><div id="modalError" class="modal-error" role="alert"></div><p><strong>'+esc(data.title)+'</strong></p><div class="section-notice" style="margin-top:16px">Vaše poznámky, stavy odevzdání, nové známky a termíny původních úkolů zůstanou zachované. Čtvrtletní hodnocení se automaticky nemění.</div><ul style="padding-left:20px">'+items+'</ul><button type="button" class="button" data-action="exportCurrent">'+icon('download')+'Zálohovat současný přehled</button></div>'+modalFooter('Přidat nové informace')+'</form>');
 }
 async function saveSourceUpdate(){
@@ -209,6 +223,7 @@ const uid=prefix=>(prefix||'evt')+'-'+(globalThis.crypto?.randomUUID?.()||Date.n
 const today=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Prague',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
 function dateFormat(value,withTime=false){if(!value)return 'Bez termínu';const d=new Date(value.length===10?value+'T12:00:00':value);return Number.isNaN(+d)?value:new Intl.DateTimeFormat('cs-CZ',{day:'numeric',month:'numeric',year:'numeric',...(withTime?{hour:'2-digit',minute:'2-digit',timeZone:'Europe/Prague'}:{})}).format(d)}
 function subj(id){return state?.subjects.find(s=>s.id===id)}
+function teacherLabel(subjectId){const name=subj(subjectId)?.teacher;return name?'<span class="teacher-label" style="display:block;font-size:11px;color:var(--muted);font-weight:400;letter-spacing:0;text-transform:none;margin-top:4px">Vyučující: '+esc(name)+'</span>':''}
 function gradeTag(g){const i=grades.indexOf(g);return '<span class="tag '+(gradeColors[i]||'gray')+'">'+esc(g||'Bez hodnocení')+'</span>'}
 function statusText(t){if(t.status==='todo'&&t.category==='learning')return 'K procvičení';if(t.status==='submitted')return t.category==='learning'?'Ověření domluveno':'Odevzdáno';return statusNames[t.status]||t.status}
 function statusTag(t){return '<span class="tag '+(statusColors[t.status]||'gray')+'">'+(t.status==='accepted'?icon('check'):'')+esc(statusText(t))+'</span>'}
@@ -218,7 +233,7 @@ function showToast(message){$('toast').innerHTML=icon('check')+esc(message);clea
 function renderNav(){ $('nav').innerHTML=navItems.map(([id,ico,label])=>'<button type="button" data-view="'+id+'" class="'+(view===id?'active':'')+'" '+(view===id?'aria-current="page"':'')+'>'+icon(ico)+'<span>'+label+'</span>'+((id==='homework'||id==='learning')&&state?'<span class="nav-count">'+state.tasks.filter(t=>t.category===id&&t.status!=='accepted').length+'</span>':'')+'</button>').join('');$('crumb').textContent=navItems.find(n=>n[0]===view)?.[2]||'Přehled'}
 function heading(title,description,add=false){return '<div class="page-heading"><div><div class="eyebrow">ŠKOLA V PŘEHLEDU</div><h1>'+title+'</h1><p>'+description+'</p></div>'+(add?'<button class="button primary" data-action="add">'+icon('plus')+'<span class="label">Přidat úkol</span></button>':'')+'</div>'}
 function sortTasks(tasks){const rank={high:0,normal:1,low:2};return tasks.slice().sort((a,b)=>(a.status==='accepted')-(b.status==='accepted')||(rank[a.priority]??1)-(rank[b.priority]??1)||(a.dueDate||'9999').localeCompare(b.dueDate||'9999'))}
-function taskRow(t){return '<button class="task-row" data-task="'+esc(t.id)+'"><span class="task-icon">'+icon(t.category==='homework'?'tasks':'learn')+'</span><span class="task-info"><strong>'+esc(t.title)+'</strong><span class="task-meta"><span>'+esc(subj(t.subjectId)?.name||t.subjectId)+'</span><span>·</span><span>'+esc(t.category==='homework'?'K odevzdání':'K doučení')+'</span>'+statusTag(t)+'</span></span><span class="arrow">'+icon('arrow')+'</span></button>'}
+function taskRow(t){return '<button class="task-row" data-task="'+esc(t.id)+'"><span class="task-icon">'+icon(t.category==='homework'?'tasks':'learn')+'</span><span class="task-info"><strong>'+esc(t.title)+'</strong><span class="task-meta"><span>'+esc(subj(t.subjectId)?.name||t.subjectId)+'</span><span>·</span><span>'+esc(t.category==='homework'?'K odevzdání':'K doučení')+'</span>'+statusTag(t)+'</span>'+teacherLabel(t.subjectId)+'</span><span class="arrow">'+icon('arrow')+'</span></button>'}
 function quarterSummary(s){if(s.exempt)return {label:'Trvale uvolněna',color:'gray',detail:'Bez úkolů k doplnění.'};const bad=s.quarter.filter(q=>q.grade==='Ještě neosvojeno');if(bad.length)return {label:'Potřebuje zlepšit',color:'rose',detail:bad.map(q=>q.area).join(' · ')};if(s.quarter.length)return {label:'Cíl v evidovaných oblastech',color:'teal',detail:s.quarter.length+' '+(s.quarter.length===1?'hodnocená oblast':'hodnocené oblasti')};return {label:'Čtvrtletí neuvedeno',color:'gray',detail:'K dispozici jsou jednotlivé výsledky.'}}
 function renderOverview(){
 const open=state.tasks.filter(t=>t.status!=='accepted'),done=state.tasks.length-open.length,unclear=open.filter(t=>t.needsClarification||t.status==='clarify').length;
@@ -233,9 +248,9 @@ return heading('Každý krok se počítá.','Úkoly, učení a hodnocení na jed
 '<div class="stat"><span class="stat-icon">'+icon('check')+'</span><div class="stat-title">Potvrzené úkoly</div><div class="stat-number">'+done+'<span style="font-size:14px;font-weight:400;color:var(--muted)"> / '+state.tasks.length+'</span></div><div class="stat-label">přijato nebo ověřeno učitelem</div><div class="bar"><span style="width:'+pct+'%"></span></div></div></div>'+
 '<div class="overview-grid"><section class="panel"><div class="panel-head"><div><h2>Na co se zaměřit nejdřív</h2><p>Otevřené úkoly podle priority a termínu.</p></div><span class="tag teal">DALŠÍ KROKY</span></div>'+ (next.length?next.map(taskRow).join(''):'<div class="empty">'+icon('check')+'<strong>Všechny úkoly mají potvrzení.</strong>Nové zadání můžete kdykoli přidat.</div>')+'</section><div><section class="panel"><div class="panel-head"><div><h2>Předměty, které potřebují pozornost</h2><p>Čtvrtletní oblasti a známé slabší výsledky.</p></div></div>'+ (risks.length?risks.map(s=>{const q=quarterSummary(s);return '<button class="subject-mini" data-subject="'+esc(s.id)+'"><span><strong>'+esc(s.name)+'</strong><small>'+esc(q.detail)+'</small></span><span class="tag '+q.color+'">'+(s.quarter.length?'Zlepšit':'Upřesnit')+'</span></button>'}).join(''):'<div class="panel-body muted small">V evidovaných čtvrtletních oblastech není Ještě neosvojeno.</div>')+'</section><div class="focus-note">'+icon('leaf')+'<div><strong>Jedna práce po druhé</strong><p>Pro začátek zvolte krátký úkol k odevzdání a jeden malý okruh k procvičení. Rozsah přizpůsobte aktuálním možnostem. Seznam zahrnuje i podmíněné kroky; počet položek není počtem nutných opravných testů.</p></div></div></div></div>'+sourceNote();
 }
-function filtersHtml(){return '<div class="filters"><label class="search-wrap"><span class="sr-only">Hledat úkol</span>'+icon('search')+'<input class="field" id="search" placeholder="Hledat v úkolech…" value="'+esc(search)+'"></label><label><span class="sr-only">Předmět</span><select id="subjectFilter"><option value="">Všechny předměty</option>'+state.subjects.filter(s=>!s.exempt).map(s=>'<option value="'+esc(s.id)+'" '+(subjectFilter===s.id?'selected':'')+'>'+esc(s.name)+'</option>').join('')+'</select></label><label><span class="sr-only">Stav</span><select id="statusFilter"><option value="">Všechny stavy</option><option value="open" '+(statusFilter==='open'?'selected':'')+'>Jen otevřené</option>'+Object.entries(statusNames).map(([id,label])=>'<option value="'+id+'" '+(statusFilter===id?'selected':'')+'>'+label+'</option>').join('')+'</select></label></div>'}
-function filteredTasks(){const q=search.toLocaleLowerCase('cs');return sortTasks(state.tasks.filter(t=>t.category===view&&(!subjectFilter||t.subjectId===subjectFilter)&&(!statusFilter||(statusFilter==='open'?t.status!=='accepted':t.status===statusFilter))&&(!q||[t.title,t.description,t.notes,subj(t.subjectId)?.name].join(' ').toLocaleLowerCase('cs').includes(q))))}
-function taskCard(t){const last=t.evaluations[t.evaluations.length-1];return '<button class="task-card '+(t.status==='accepted'?'accepted':'')+'" data-task="'+esc(t.id)+'"><div class="task-card-head"><span class="task-card-subject">'+esc(subj(t.subjectId)?.name||t.subjectId)+'</span><span class="tag '+(t.priority==='high'?'amber':'gray')+'">'+esc(priorities[t.priority]||'Postupně')+'</span></div><h3>'+esc(t.title)+'</h3><div style="display:flex;gap:6px;flex-wrap:wrap;margin:8px 0">'+taskTypeHtml(t)+(t.sourceUpdates?.length?'<span class="tag amber">Nové informace v detailu</span>':'')+'</div><div class="task-card-desc">'+esc(t.description)+'</div>'+(last?'<div class="last-grade">Poslední výsledek '+gradeTag(last.grade)+'</div>':'')+'<div class="task-card-bottom">'+statusTag(t)+'<span class="small muted">'+(t.dueDate?'Termín '+esc(dateFormat(t.dueDate)):t.needsClarification?'Podmínky k ověření':'Termín nedohodnut')+'</span></div></button>'}
+function filtersHtml(){return '<div class="filters"><label class="search-wrap"><span class="sr-only">Hledat úkol</span>'+icon('search')+'<input class="field" id="search" placeholder="Hledat úkol nebo vyučujícího…" value="'+esc(search)+'"></label><label><span class="sr-only">Předmět</span><select id="subjectFilter"><option value="">Všechny předměty</option>'+state.subjects.filter(s=>!s.exempt).map(s=>'<option value="'+esc(s.id)+'" '+(subjectFilter===s.id?'selected':'')+'>'+esc(s.name)+'</option>').join('')+'</select></label><label><span class="sr-only">Stav</span><select id="statusFilter"><option value="">Všechny stavy</option><option value="open" '+(statusFilter==='open'?'selected':'')+'>Jen otevřené</option>'+Object.entries(statusNames).map(([id,label])=>'<option value="'+id+'" '+(statusFilter===id?'selected':'')+'>'+label+'</option>').join('')+'</select></label></div>'}
+function filteredTasks(){const q=search.toLocaleLowerCase('cs');return sortTasks(state.tasks.filter(t=>t.category===view&&(!subjectFilter||t.subjectId===subjectFilter)&&(!statusFilter||(statusFilter==='open'?t.status!=='accepted':t.status===statusFilter))&&(!q||[t.title,t.description,t.notes,subj(t.subjectId)?.name,subj(t.subjectId)?.teacher].join(' ').toLocaleLowerCase('cs').includes(q))))}
+function taskCard(t){const last=t.evaluations[t.evaluations.length-1];return '<button class="task-card '+(t.status==='accepted'?'accepted':'')+'" data-task="'+esc(t.id)+'"><div class="task-card-head"><div><span class="task-card-subject">'+esc(subj(t.subjectId)?.name||t.subjectId)+'</span>'+teacherLabel(t.subjectId)+'</div><span class="tag '+(t.priority==='high'?'amber':'gray')+'">'+esc(priorities[t.priority]||'Postupně')+'</span></div><h3>'+esc(t.title)+'</h3><div style="display:flex;gap:6px;flex-wrap:wrap;margin:8px 0">'+taskTypeHtml(t)+(t.sourceUpdates?.length?'<span class="tag amber">Nové informace v detailu</span>':'')+'</div><div class="task-card-desc">'+esc(t.description)+'</div>'+(last?'<div class="last-grade">Poslední výsledek '+gradeTag(last.grade)+'</div>':'')+'<div class="task-card-bottom">'+statusTag(t)+'<span class="small muted">'+(t.dueDate?'Termín '+esc(dateFormat(t.dueDate)):t.needsClarification?'Podmínky k ověření':'Termín nedohodnut')+'</span></div></button>'}
 function taskResultsHtml(){const rows=filteredTasks();return '<div class="results-label">'+rows.length+' '+(rows.length===1?'položka':rows.length>1&&rows.length<5?'položky':'položek')+' · kliknutím otevřete detail</div><div class="task-grid">'+(rows.length?rows.map(taskCard).join(''):'<div class="empty">'+icon('search')+'<strong>Tomuto výběru nic neodpovídá.</strong>Zkuste změnit filtr nebo přidat úkol.</div>')+'</div>'}
 function renderTasks(){return heading(view==='homework'?'Domácí úkoly k odevzdání':'Znalosti k doučení',view==='homework'?'Dopracovat, odevzdat a zaznamenat zpětnou vazbu učitele.':'Procvičit konkrétní látku a domluvit způsob ověření. Samotné doučení ještě nemění hodnocení.',true)+filtersHtml()+'<div id="taskResults">'+taskResultsHtml()+'</div>'+sourceNote()}
 function renderSubjects(){return heading('Předměty a jejich hodnocení','Čtvrtletní oblasti se aktualizují samostatně podle učitele. Výsledky jednotlivých úkolů jsou uvedené v jejich detailech.')+'<div class="subject-grid">'+state.subjects.map(s=>{const q=quarterSummary(s);const open=state.tasks.filter(t=>t.subjectId===s.id&&t.status!=='accepted').length;return '<section class="subject-card"><div class="subject-card-top"><div><h2>'+esc(s.name)+'</h2><p>'+esc(s.teacher||'Vyučující neuveden')+'</p></div><span class="tag '+q.color+'">'+esc(q.label)+'</span></div><p class="summary">'+esc(s.summary)+'</p><div class="quarter-list">'+(s.quarter.length?s.quarter.map(a=>'<div class="quarter-line"><span>'+esc(a.area)+'</span>'+gradeTag(a.grade)+'</div>').join(''):'<span class="small muted">'+(s.exempt?'Z plánu doplňování vyřazeno.':'Samostatné čtvrtletní hodnocení nebylo v podkladech uvedeno.')+'</span>')+'</div><div class="subject-card-footer"><span class="small muted">'+(s.exempt?'Trvalé uvolnění':open+' otevřených úkolů')+'</span><button class="button subtle" data-subject="'+esc(s.id)+'">'+(s.exempt?'Zobrazit':'Detail a hodnocení')+icon('arrow')+'</button></div></section>'}).join('')+'</div>'+sourceNote()}
@@ -279,6 +294,7 @@ function openTask(id,isNew=false){
  const category=t.category==='homework'?'K odevzdání':'K doučení';
  const evals=t.evaluations.slice().reverse();
  openModal('<form id="taskForm" data-id="'+esc(t.id)+'" data-new="'+(!existing)+'">'+modalHead((existing?subj(t.subjectId)?.name+' · ':'')+category,existing?t.title:'Nový úkol')+'<div class="modal-body"><div id="modalError" class="modal-error" role="alert"></div>'+
+ '<div id="taskTeacher" style="margin-bottom:16px">'+teacherLabel(t.subjectId)+'</div>'+
  taskTypeHtml(t)+sourceUpdatesHtml(t)+'<div class="form-field"><label for="taskTitle">Název úkolu</label><input class="field" id="taskTitle" name="title" value="'+esc(t.title)+'" required maxlength="240"></div>'+
  '<div class="form-grid"><div class="form-field"><label for="taskSubject">Předmět</label><select id="taskSubject" name="subjectId">'+selectOptions(state.subjects.filter(s=>!s.exempt).map(s=>[s.id,s.name]),t.subjectId)+'</select></div><div class="form-field"><label for="taskCategory">Kategorie</label><select id="taskCategory" name="category">'+selectOptions([['homework','Domácí úkol k odevzdání'],['learning','Znalosti k doučení']],t.category)+'</select></div>'+
  '<div class="form-field full-width"><label for="taskDescription">Co konkrétně udělat</label><textarea id="taskDescription" name="description" maxlength="8000">'+esc(t.description)+'</textarea></div>'+
@@ -364,7 +380,7 @@ document.addEventListener('click',async e=>{
 $('content').addEventListener('input',e=>{if(e.target.id==='search'){search=e.target.value;$('taskResults').innerHTML=taskResultsHtml()}});
 $('content').addEventListener('change',e=>{if(e.target.id==='subjectFilter'){subjectFilter=e.target.value;$('taskResults').innerHTML=taskResultsHtml()}if(e.target.id==='statusFilter'){statusFilter=e.target.value;$('taskResults').innerHTML=taskResultsHtml()}});
 $('modal').addEventListener('input',()=>{dialogDirty=true;setSaveStatus('Rozpracované změny','busy')});
-$('modal').addEventListener('change',e=>{dialogDirty=true;setSaveStatus('Rozpracované změny','busy');if(e.target.id==='taskCategory'){const option=$('taskStatus')?.querySelector('option[value="submitted"]');if(option)option.textContent=e.target.value==='learning'?'Ověření domluveno':'Odevzdáno'}});
+$('modal').addEventListener('change',e=>{if(e.target.id==='taskSubject'&&$('taskTeacher'))$('taskTeacher').innerHTML=teacherLabel(e.target.value);dialogDirty=true;setSaveStatus('Rozpracované změny','busy');if(e.target.id==='taskCategory'){const option=$('taskStatus')?.querySelector('option[value="submitted"]');if(option)option.textContent=e.target.value==='learning'?'Ověření domluveno':'Odevzdáno'}});
 $('modal').addEventListener('cancel',e=>{e.preventDefault();closeModal()});
 $('modal').addEventListener('submit',e=>{e.preventDefault();if(e.target.id==='taskForm')saveTask(e.target);if(e.target.id==='subjectForm')saveSubject(e.target);if(e.target.id==='importForm')saveImport(e.target)});
 $('exportBtn').addEventListener('click',()=>exportData(Boolean(pendingState)));
