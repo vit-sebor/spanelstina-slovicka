@@ -109,7 +109,7 @@
     let canSave=true;
     let state;
     try {const saved=localStorage.getItem(KEY);state=saved?parseState(saved):deepCopy(INITIAL);localStorage.setItem(KEY,JSON.stringify(state))} catch(e) {state=deepCopy(INITIAL);canSave=false}
-    selectedLesson=['1','2','3','4','all'].includes(String(state.selectedLesson))?String(state.selectedLesson):'1';
+    selectedLesson=(String(state.selectedLesson)==='all'||LESSONS.some(l=>String(l.number)===String(state.selectedLesson)))?String(state.selectedLesson):'1';
     WORDS=selectedLesson==='all'?ALL_WORDS:LESSONS[Number(selectedLesson)-1].words;
     let tab='home',mode='due',session=null,query='',wordFilter='all';
     const root=document.getElementById('app');
@@ -127,7 +127,7 @@
     function currentLabel(){return selectedLesson==='all'?'LEKCE 1–4 · VŠECHNA SLOVÍČKA':'LECCIÓN '+selectedLesson+' · '+LESSONS[Number(selectedLesson)-1].title.toLocaleUpperCase('es-ES')}
     function commonHeader(){return `<div class="eyebrow">${html(currentLabel())}</div>`}
     function lessonPicker(){return `<div class="lesson-picker" role="group" aria-label="Vybrat lekci">${LESSONS.map(l=>`<button type="button" class="lesson-chip ${selectedLesson===String(l.number)?'active':''}" data-lesson="${l.number}" aria-pressed="${selectedLesson===String(l.number)}">Lekce ${l.number}<small>${l.words.length} slov${l.partial?' · část':''}</small></button>`).join('')}<button type="button" class="lesson-chip ${selectedLesson==='all'?'active':''}" data-lesson="all" aria-pressed="${selectedLesson==='all'}">Všechny lekce<small>${ALL_WORDS.length} slov</small></button></div>`}
-    function changeLesson(l){if(!['1','2','3','4','all'].includes(l))return;selectedLesson=l;WORDS=l==='all'?ALL_WORDS:LESSONS[Number(l)-1].words;state.selectedLesson=l;session=null;mode='due';query='';wordFilter='all';persist();render()}
+    function changeLesson(l){if(l!=='all'&&!LESSONS.some(x=>String(x.number)===l))return;selectedLesson=l;WORDS=l==='all'?ALL_WORDS:LESSONS[Number(l)-1].words;state.selectedLesson=l;session=null;mode='due';query='';wordFilter='all';persist();render()}
     function statsHtml(){const c=counts();return `<section class="stats" aria-label="Přehled pokroku">
       <div class="stat good"><span class="number">${c.mastered}<span style="font-size:17px;color:#629782">/${WORDS.length}</span></span><span class="label">Zvládnutých slovíček</span></div>
       <div class="stat"><span class="number">${c.learning}</span><span class="label">Právě se učím</span></div>
@@ -139,7 +139,7 @@
       <button type="button" class="segment ${state.direction==='es-cs'?'active':''}" data-dir="es-cs" aria-pressed="${state.direction==='es-cs'}">Španělsky → česky</button>
     </div>`}
     function modeHtml(){const c=counts();return `<label class="form-label">Co procvičovat?</label><div class="modes" role="group" aria-label="Výběr slovíček">
-      <button type="button" class="mode ${mode==='due'?'active':''}" data-mode="due" aria-pressed="${mode==='due'}">Dnešní opakování<span>${c.due} slov</span></button>
+      <button type="button" class="mode ${mode==='due'?'active':''}" data-mode="due" aria-pressed="${mode==='due'}">Dnešní opakování<span>${Math.min(15,c.due)} z ${c.due} slov</span></button>
       <button type="button" class="mode ${mode==='all'?'active':''}" data-mode="all" aria-pressed="${mode==='all'}">Všechna slovíčka<span>${WORDS.length} slov</span></button>
       <button type="button" class="mode ${mode==='hard'?'active':''}" data-mode="hard" aria-pressed="${mode==='hard'}">Obtížná<span>${WORDS.filter(w=>rawCard(w).wrong>0).length} slov</span></button>
     </div>`}
@@ -154,7 +154,7 @@
       <div class="divider"></div><h3>Stav znalostí</h3><div class="goal-top"><strong>${Math.round(c.mastered/WORDS.length*100)} %</strong><span>zvládnuto</span></div><div class="progress-track"><div class="progress-fill" style="width:${c.mastered/WORDS.length*100}%"></div></div>
       <p class="subtle" style="margin-top:12px">Zvládnuté = alespoň 3 úspěšná opakování daného výrazu.</p></section>
       <div class="info"><h3>Jak funguje opakování?</h3><p>Po úspěšné odpovědi se slovíčko odloží na 1, 3, 7, 14 nebo 30 dní. Pokud ho nevíte, objeví se znovu v dnešním procvičování. Pokrok se sleduje zvlášť pro oba směry překladu.</p></div></aside></div>`}
-    function createQueue(chosenMode){if(chosenMode==='all')return shuffle(WORDS.map(w=>w.id));if(chosenMode==='hard')return shuffle(WORDS.filter(w=>rawCard(w).wrong>0).map(w=>w.id));return shuffle(WORDS.filter(isDue).map(w=>w.id))}
+    function createQueue(chosenMode){if(chosenMode==='all')return shuffle(WORDS.map(w=>w.id));if(chosenMode==='hard')return shuffle(WORDS.filter(w=>rawCard(w).wrong>0).map(w=>w.id));return shuffle(WORDS.filter(isDue).map(w=>w.id)).slice(0,15)}
     function startSession(chosenMode=mode,ids=null){const queue=ids?[...ids]:createQueue(chosenMode);if(!queue.length){showToast(chosenMode==='due'?'Všechna dnešní opakování jsou hotová. Zkuste „Všechna slovíčka“.':'V tomto výběru zatím nejsou žádná slovíčka.');return}tab='home';session={queue,index:0,known:0,missed:0,revealed:false,done:false,seenInSession:{},direction:state.direction};window.scrollTo({top:0,behavior:'smooth'});render()}
     function sessionHtml(){if(session.done)return finishHtml();const word=WORDS.find(w=>w.id===session.queue[session.index]);if(!word){session.done=true;return finishHtml()}const forward=session.direction==='cs-es';const source=forward?word.cs:word.es;const target=forward?word.es:word.cs;
       return `<div class="section-head"><div>${commonHeader()}<h1 style="font-size:clamp(27px,4vw,38px)">Procvičujeme</h1><p class="subtle">${forward?'Z češtiny do španělštiny':'Ze španělštiny do češtiny'}</p></div><button type="button" class="text-btn" id="end">Ukončit lekci</button></div>
@@ -175,7 +175,7 @@
     // Safari/iOS: choose an actual Spanish voice, retain utterance and surface playback errors.
     let liveUtterance=null;
     function spanishVoices(){if(!('speechSynthesis' in window))return [];return window.speechSynthesis.getVoices().filter(v=>/^es([_-]|$)/i.test(v.lang||''))}
-    function spokenText(input){return input.replace(/\/a\\b/g,'').replace(/[¿?¡!]/g,'').trim()}
+    function spokenText(input){return input.replace(/el\/la\s+/gi,'el ').replace(/\/a\b/g,'').replace(/[¿?¡!]/g,'').trim()}
     function playSpanish(input){
       if(!('speechSynthesis' in window)||!('SpeechSynthesisUtterance' in window)){showToast('Prohlížeč nepodporuje hlasové čtení.');return}
       try{
