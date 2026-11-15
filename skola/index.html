@@ -42,6 +42,8 @@ function validate(s){
  for(const sub of s.subjects){if(sub.evidence.some(e=>!e||typeof e.title!=='string')||typeof sub.summary!=='string')return 'Neplatné podklady předmětu.';}
  for(const t of s.tasks){if(!Array.isArray(t.relatedIds)||t.relatedIds.some(id=>typeof id!=='string'))return 'Neplatné související úkoly.';}
  if(s.history.some(h=>!h||typeof h.date!=='string'||typeof h.label!=='string'))return 'Neplatná historie změn.';
+ if(s.appliedUpdates!==undefined&&(!Array.isArray(s.appliedUpdates)||s.appliedUpdates.some(id=>typeof id!=='string')))return 'Neplatný seznam aktualizací.';
+ for(const t of s.tasks){if(t.sourceUpdates!==undefined&&(!Array.isArray(t.sourceUpdates)||t.sourceUpdates.some(u=>!u||typeof u.text!=='string'||typeof u.date!=='string')))return 'Neplatné podklady úkolu.';}
  return null;
 }
 const KEY='school-tracker-pages-v1:'+new URL('.',window.location.href).pathname;
@@ -104,7 +106,7 @@ window.fetch=async function(input,options={}){
 <div class="sidebar-foot"><div class="goal-card"><div class="small">Společný cíl</div><strong>Nejméně Částečně osvojeno</strong><p>Po malých krocích. S přehledem o tom, co už je hotové.</p></div><p>Data uložená v tomto prohlížeči<br>Nezapomeňte na export zálohy</p></div>
 </aside>
 <main class="main">
-<header class="topbar"><div class="breadcrumb">Školní přehled <span>/ <span id="crumb">Přehled</span></span></div><div class="top-actions"><span id="saveState" class="save-state" aria-live="polite"><i class="dot busy"></i>Načítám…</span><button class="button" id="exportBtn" title="Stáhnout zálohu dat" disabled><span id="exportIcon"></span><span class="label">Export</span></button><button class="button" id="importBtn" title="Obnovit data ze zálohy" disabled><span id="importIcon"></span><span class="label">Import</span></button><button class="button icon-button print-button" id="printBtn" title="Vytisknout zobrazený přehled" aria-label="Vytisknout zobrazený přehled"><span id="printIcon"></span></button></div></header>
+<header class="topbar"><div class="breadcrumb">Školní přehled <span>/ <span id="crumb">Přehled</span></span></div><div class="top-actions"><span id="saveState" class="save-state" aria-live="polite"><i class="dot busy"></i>Načítám…</span><button class="button" id="exportBtn" title="Stáhnout zálohu dat" disabled><span id="exportIcon"></span><span class="label">Export</span></button><button class="button" id="importBtn" title="Načíst zálohu nebo nové informace z EduPage" disabled><span id="importIcon"></span><span class="label">Import</span></button><button class="button icon-button print-button" id="printBtn" title="Vytisknout zobrazený přehled" aria-label="Vytisknout zobrazený přehled"><span id="printIcon"></span></button></div></header>
 <div id="globalBanner" role="alert"></div>
 <div id="content"><div class="loading"><div class="spinner"></div>Načítám školní přehled…</div></div>
 </main>
@@ -114,6 +116,64 @@ window.fetch=async function(input,options={}){
 <div id="toast" class="toast" role="status"></div>
 <script>
 'use strict';
+function mergeSchoolUpdate(current, update){
+ const copy=x=>JSON.parse(JSON.stringify(x));
+ const fail=message=>{throw new Error(message)};
+ const text=x=>typeof x==='string'&&x.length>0&&x.length<=20000;
+ if(!update||update.format!=='school-tracker-update'||update.schemaVersion!==1||!text(update.id)||!text(update.title)||!/^\d{4}-\d{2}-\d{2}$/.test(update.date)||!Array.isArray(update.newTasks)||!Array.isArray(update.taskUpdates)||!Array.isArray(update.subjectUpdates))fail('Neplatný soubor aktualizace.');
+ if(!current||!Array.isArray(current.subjects)||!Array.isArray(current.tasks)||!Array.isArray(current.history))fail('Neplatný aktuální přehled.');
+ if(current.appliedUpdates?.includes(update.id))return {state:copy(current),changes:[],alreadyApplied:true};
+ const candidate=copy(current.subjects.length?current:update.initialState);
+ if(!candidate||!Array.isArray(candidate.subjects)||!Array.isArray(candidate.tasks)||!Array.isArray(candidate.history))fail('Aktualizace vyžaduje nejprve načíst výchozí přehled.');
+ const changes=[];
+ const subject=id=>candidate.subjects.find(s=>s.id===id)||fail('Předmět aktualizace v přehledu chybí. Načtěte správný přehled.');
+ const ids=new Set(candidate.tasks.map(t=>t.id));
+ for(const task of update.newTasks){
+  if(!task||!text(task.id)||!text(task.title))fail('Neplatný nový úkol.');
+  if(ids.has(task.id))fail('Úkol '+task.id+' už existuje. Aktualizaci nelze bezpečně sloučit.');
+  subject(task.subjectId);ids.add(task.id);candidate.tasks.push(copy(task));
+  changes.push({kind:'new',label:task.title});
+ }
+ for(const change of update.taskUpdates){
+  const task=candidate.tasks.find(t=>t.id===change.id);
+  if(!task||task.subjectId!==change.subjectId)fail('Původní úkol aktualizace v přehledu chybí nebo má jiný předmět.');
+  if(!text(change.notice))fail('Chybí text aktualizace úkolu.');
+  if(change.title!==undefined){if(!text(change.title))fail('Neplatný název úkolu.');task.previousSourceTitles=[...(task.previousSourceTitles||[]),task.title];task.title=change.title;}
+  task.sourceUpdates=[...(task.sourceUpdates||[]),{id:update.id,date:update.date,text:change.notice}];
+  changes.push({kind:'update',label:task.title});
+ }
+ for(const change of update.subjectUpdates){
+  const s=subject(change.id);
+  if(!text(change.summary)||!Array.isArray(change.evidence))fail('Neplatná aktualizace předmětu.');
+  s.previousSourceSummaries=[...(s.previousSourceSummaries||[]),{date:update.date,text:s.summary}];
+  s.summary=change.summary;s.evidence.push(...copy(change.evidence));
+  changes.push({kind:'subject',label:s.name});
+ }
+ candidate.appliedUpdates=[...(candidate.appliedUpdates||[]),update.id];
+ candidate.source.latestUpdate=update.date;
+ candidate.history.push({id:update.id,date:new Date().toISOString(),label:'Doplněny podklady: '+update.title+'. Osobní poznámky, stavy, termíny původních úkolů a hodnocení zachovány.'});
+ return {state:candidate,changes,alreadyApplied:false};
+}
+let updateCandidate=null;
+function sourceUpdatesHtml(task){
+ const updates=Array.isArray(task.sourceUpdates)?task.sourceUpdates:[];
+ return updates.map(u=>'<div class="section-notice"><strong>Nové informace · '+esc(dateFormat(u.date))+'</strong><p style="margin-top:8px;white-space:pre-wrap">'+esc(u.text)+'</p></div>').join('');
+}
+function taskTypeHtml(task){return (task.optional?'<span class="tag gray">Volitelné</span>':'')+(task.assignmentType==='regular-test'?'<span class="tag blue">Řádný test'+(task.lesson?' · '+esc(task.lesson)+'. hodina':'')+'</span>':task.assignmentType==='current-homework'?'<span class="tag blue">Běžný domácí úkol</span>':'');}
+function prepareSourceUpdate(data){
+ const result=mergeSchoolUpdate(state,data);
+ if(result.alreadyApplied){showToast('Tato aktualizace už je načtená. Žádné položky se nezdvojily.');return;}
+ if(!validState(result.state))throw new Error('Výsledná aktualizace nemá platná data. Nic nebylo změněno.');
+ updateCandidate=result.state;
+ const items=result.changes.map(x=>'<li style="margin:8px 0"><strong>'+esc({new:'Nový úkol',update:'Upřesnění úkolu',subject:'Podklad předmětu'}[x.kind])+':</strong> '+esc(x.label)+'</li>').join('');
+ openModal('<form id="updateForm">'+modalHead('Doplnění z EduPage','Přidat nové informace')+'<div class="modal-body"><div id="modalError" class="modal-error" role="alert"></div><p><strong>'+esc(data.title)+'</strong></p><div class="section-notice" style="margin-top:16px">Vaše poznámky, stavy odevzdání, nové známky a termíny původních úkolů zůstanou zachované. Čtvrtletní hodnocení se automaticky nemění.</div><ul style="padding-left:20px">'+items+'</ul><button type="button" class="button" data-action="exportCurrent">'+icon('download')+'Zálohovat současný přehled</button></div>'+modalFooter('Přidat nové informace')+'</form>');
+}
+async function saveSourceUpdate(){
+ if(!updateCandidate)return;
+ if(await persist(updateCandidate,'Nové informace jsou doplněné')){updateCandidate=null;closeModal(true);}
+}
+document.addEventListener('submit',e=>{if(e.target.id==='updateForm'){e.preventDefault();saveSourceUpdate();}});
+
 const ICONS={
 home:'<path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1z"/>',
 tasks:'<rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V2h6v2M9 10h6M9 14h6M9 18h3"/>',
@@ -152,7 +212,7 @@ function subj(id){return state?.subjects.find(s=>s.id===id)}
 function gradeTag(g){const i=grades.indexOf(g);return '<span class="tag '+(gradeColors[i]||'gray')+'">'+esc(g||'Bez hodnocení')+'</span>'}
 function statusText(t){if(t.status==='todo'&&t.category==='learning')return 'K procvičení';if(t.status==='submitted')return t.category==='learning'?'Ověření domluveno':'Odevzdáno';return statusNames[t.status]||t.status}
 function statusTag(t){return '<span class="tag '+(statusColors[t.status]||'gray')+'">'+(t.status==='accepted'?icon('check'):'')+esc(statusText(t))+'</span>'}
-function sourceNote(){const offline=window.__sofieOffline===true?'<br><strong>Ukládání v prohlížeči:</strong> '+(window.__sofieStorageAvailable===false?'Trvalé ukládání není dostupné. Změny zůstávají jen do zavření tohoto okna; pravidelně použijte Export.':'Data se ukládají v tomto prohlížeči. Změny se mezi zařízeními samy nesynchronizují. Pro zálohu a přenos použijte Export a Import.') : '';return '<div class="source-note"><strong>'+esc(state.source.label)+'</strong> · výchozí podklady '+esc(dateFormat(state.source.asOf))+'.<br>Nové údaje se zapisují ručně. Přehled není automaticky propojen s EduPage. Hodnocení jednotlivých prací nemění čtvrtletní oblasti.'+offline+'</div>'}
+function sourceNote(){const offline=window.__sofieOffline===true?'<br><strong>Ukládání v prohlížeči:</strong> '+(window.__sofieStorageAvailable===false?'Trvalé ukládání není dostupné. Změny zůstávají jen do zavření tohoto okna; pravidelně použijte Export.':'Data se ukládají v tomto prohlížeči. Změny se mezi zařízeními samy nesynchronizují. Pro zálohu a přenos použijte Export a Import.') : '';return '<div class="source-note"><strong>'+esc(state.source.label)+'</strong> · výchozí podklady '+esc(dateFormat(state.source.asOf))+(state.source.latestUpdate?' · doplněno '+esc(dateFormat(state.source.latestUpdate)):'')+'.<br>Nové údaje se zapisují ručně. Přehled není automaticky propojen s EduPage. Hodnocení jednotlivých prací nemění čtvrtletní oblasti.'+offline+'</div>'}
 function setSaveStatus(text,type='ok'){if(text==='Uloženo'&&window.__sofieOffline===true&&window.__sofieStorageAvailable===false){text='Pouze v tomto okně';type='error'}$('saveState').innerHTML='<i class="dot '+(type==='error'?'error':type==='busy'?'busy':'')+'"></i>'+esc(text)}
 function showToast(message){$('toast').innerHTML=icon('check')+esc(message);clearTimeout(showToast.timer);showToast.timer=setTimeout(()=>$('toast').textContent='',3800)}
 function renderNav(){ $('nav').innerHTML=navItems.map(([id,ico,label])=>'<button type="button" data-view="'+id+'" class="'+(view===id?'active':'')+'" '+(view===id?'aria-current="page"':'')+'>'+icon(ico)+'<span>'+label+'</span>'+((id==='homework'||id==='learning')&&state?'<span class="nav-count">'+state.tasks.filter(t=>t.category===id&&t.status!=='accepted').length+'</span>':'')+'</button>').join('');$('crumb').textContent=navItems.find(n=>n[0]===view)?.[2]||'Přehled'}
@@ -175,7 +235,7 @@ return heading('Každý krok se počítá.','Úkoly, učení a hodnocení na jed
 }
 function filtersHtml(){return '<div class="filters"><label class="search-wrap"><span class="sr-only">Hledat úkol</span>'+icon('search')+'<input class="field" id="search" placeholder="Hledat v úkolech…" value="'+esc(search)+'"></label><label><span class="sr-only">Předmět</span><select id="subjectFilter"><option value="">Všechny předměty</option>'+state.subjects.filter(s=>!s.exempt).map(s=>'<option value="'+esc(s.id)+'" '+(subjectFilter===s.id?'selected':'')+'>'+esc(s.name)+'</option>').join('')+'</select></label><label><span class="sr-only">Stav</span><select id="statusFilter"><option value="">Všechny stavy</option><option value="open" '+(statusFilter==='open'?'selected':'')+'>Jen otevřené</option>'+Object.entries(statusNames).map(([id,label])=>'<option value="'+id+'" '+(statusFilter===id?'selected':'')+'>'+label+'</option>').join('')+'</select></label></div>'}
 function filteredTasks(){const q=search.toLocaleLowerCase('cs');return sortTasks(state.tasks.filter(t=>t.category===view&&(!subjectFilter||t.subjectId===subjectFilter)&&(!statusFilter||(statusFilter==='open'?t.status!=='accepted':t.status===statusFilter))&&(!q||[t.title,t.description,t.notes,subj(t.subjectId)?.name].join(' ').toLocaleLowerCase('cs').includes(q))))}
-function taskCard(t){const last=t.evaluations[t.evaluations.length-1];return '<button class="task-card '+(t.status==='accepted'?'accepted':'')+'" data-task="'+esc(t.id)+'"><div class="task-card-head"><span class="task-card-subject">'+esc(subj(t.subjectId)?.name||t.subjectId)+'</span><span class="tag '+(t.priority==='high'?'amber':'gray')+'">'+esc(priorities[t.priority]||'Postupně')+'</span></div><h3>'+esc(t.title)+'</h3><div class="task-card-desc">'+esc(t.description)+'</div>'+(last?'<div class="last-grade">Poslední výsledek '+gradeTag(last.grade)+'</div>':'')+'<div class="task-card-bottom">'+statusTag(t)+'<span class="small muted">'+(t.dueDate?'Termín '+esc(dateFormat(t.dueDate)):t.needsClarification?'Podmínky k ověření':'Termín nedohodnut')+'</span></div></button>'}
+function taskCard(t){const last=t.evaluations[t.evaluations.length-1];return '<button class="task-card '+(t.status==='accepted'?'accepted':'')+'" data-task="'+esc(t.id)+'"><div class="task-card-head"><span class="task-card-subject">'+esc(subj(t.subjectId)?.name||t.subjectId)+'</span><span class="tag '+(t.priority==='high'?'amber':'gray')+'">'+esc(priorities[t.priority]||'Postupně')+'</span></div><h3>'+esc(t.title)+'</h3><div style="display:flex;gap:6px;flex-wrap:wrap;margin:8px 0">'+taskTypeHtml(t)+(t.sourceUpdates?.length?'<span class="tag amber">Nové informace v detailu</span>':'')+'</div><div class="task-card-desc">'+esc(t.description)+'</div>'+(last?'<div class="last-grade">Poslední výsledek '+gradeTag(last.grade)+'</div>':'')+'<div class="task-card-bottom">'+statusTag(t)+'<span class="small muted">'+(t.dueDate?'Termín '+esc(dateFormat(t.dueDate)):t.needsClarification?'Podmínky k ověření':'Termín nedohodnut')+'</span></div></button>'}
 function taskResultsHtml(){const rows=filteredTasks();return '<div class="results-label">'+rows.length+' '+(rows.length===1?'položka':rows.length>1&&rows.length<5?'položky':'položek')+' · kliknutím otevřete detail</div><div class="task-grid">'+(rows.length?rows.map(taskCard).join(''):'<div class="empty">'+icon('search')+'<strong>Tomuto výběru nic neodpovídá.</strong>Zkuste změnit filtr nebo přidat úkol.</div>')+'</div>'}
 function renderTasks(){return heading(view==='homework'?'Domácí úkoly k odevzdání':'Znalosti k doučení',view==='homework'?'Dopracovat, odevzdat a zaznamenat zpětnou vazbu učitele.':'Procvičit konkrétní látku a domluvit způsob ověření. Samotné doučení ještě nemění hodnocení.',true)+filtersHtml()+'<div id="taskResults">'+taskResultsHtml()+'</div>'+sourceNote()}
 function renderSubjects(){return heading('Předměty a jejich hodnocení','Čtvrtletní oblasti se aktualizují samostatně podle učitele. Výsledky jednotlivých úkolů jsou uvedené v jejich detailech.')+'<div class="subject-grid">'+state.subjects.map(s=>{const q=quarterSummary(s);const open=state.tasks.filter(t=>t.subjectId===s.id&&t.status!=='accepted').length;return '<section class="subject-card"><div class="subject-card-top"><div><h2>'+esc(s.name)+'</h2><p>'+esc(s.teacher||'Vyučující neuveden')+'</p></div><span class="tag '+q.color+'">'+esc(q.label)+'</span></div><p class="summary">'+esc(s.summary)+'</p><div class="quarter-list">'+(s.quarter.length?s.quarter.map(a=>'<div class="quarter-line"><span>'+esc(a.area)+'</span>'+gradeTag(a.grade)+'</div>').join(''):'<span class="small muted">'+(s.exempt?'Z plánu doplňování vyřazeno.':'Samostatné čtvrtletní hodnocení nebylo v podkladech uvedeno.')+'</span>')+'</div><div class="subject-card-footer"><span class="small muted">'+(s.exempt?'Trvalé uvolnění':open+' otevřených úkolů')+'</span><button class="button subtle" data-subject="'+esc(s.id)+'">'+(s.exempt?'Zobrazit':'Detail a hodnocení')+icon('arrow')+'</button></div></section>'}).join('')+'</div>'+sourceNote()}
@@ -219,7 +279,7 @@ function openTask(id,isNew=false){
  const category=t.category==='homework'?'K odevzdání':'K doučení';
  const evals=t.evaluations.slice().reverse();
  openModal('<form id="taskForm" data-id="'+esc(t.id)+'" data-new="'+(!existing)+'">'+modalHead((existing?subj(t.subjectId)?.name+' · ':'')+category,existing?t.title:'Nový úkol')+'<div class="modal-body"><div id="modalError" class="modal-error" role="alert"></div>'+
- '<div class="form-field"><label for="taskTitle">Název úkolu</label><input class="field" id="taskTitle" name="title" value="'+esc(t.title)+'" required maxlength="240"></div>'+
+ taskTypeHtml(t)+sourceUpdatesHtml(t)+'<div class="form-field"><label for="taskTitle">Název úkolu</label><input class="field" id="taskTitle" name="title" value="'+esc(t.title)+'" required maxlength="240"></div>'+
  '<div class="form-grid"><div class="form-field"><label for="taskSubject">Předmět</label><select id="taskSubject" name="subjectId">'+selectOptions(state.subjects.filter(s=>!s.exempt).map(s=>[s.id,s.name]),t.subjectId)+'</select></div><div class="form-field"><label for="taskCategory">Kategorie</label><select id="taskCategory" name="category">'+selectOptions([['homework','Domácí úkol k odevzdání'],['learning','Znalosti k doučení']],t.category)+'</select></div>'+
  '<div class="form-field full-width"><label for="taskDescription">Co konkrétně udělat</label><textarea id="taskDescription" name="description" maxlength="8000">'+esc(t.description)+'</textarea></div>'+
  '<div class="form-field"><label for="taskStatus">Stav</label><select id="taskStatus" name="status">'+selectOptions(Object.entries(statusNames).map(([v,l])=>[v,v==='submitted'?(t.category==='learning'?'Ověření domluveno':'Odevzdáno'):l]),t.status)+'</select></div><div class="form-field"><label for="taskPriority">Priorita</label><select id="taskPriority" name="priority">'+selectOptions(Object.entries(priorities),t.priority)+'</select></div>'+
@@ -281,7 +341,7 @@ function exportData(usePending=false){
 let importCandidate=null;
 async function prepareImport(file){
  if(!file)return;if(file.size>800000){showToast('Soubor je příliš velký. Maximum je 800 kB.');return}
- try{const data=JSON.parse(await file.text());if(!validState(data))throw new Error('Tento soubor nemá platný formát zálohy školního přehledu.');
+ try{const data=JSON.parse(await file.text());if(data?.format==='school-tracker-update'){prepareSourceUpdate(data);return;}if(!validState(data))throw new Error('Tento soubor nemá platný formát zálohy školního přehledu.');
  importCandidate=data;openModal('<form id="importForm">'+modalHead('Obnova ze zálohy','Import dat')+'<div class="modal-body"><div id="modalError" class="modal-error" role="alert"></div><p style="font-size:13px">Záloha <strong>'+esc(file.name)+'</strong> nahradí aktuální přehled. Nejprve můžete stáhnout současná data.</p><div class="import-summary"><div class="stat"><div class="stat-title">Předměty</div><div class="stat-number">'+data.subjects.length+'</div></div><div class="stat"><div class="stat-title">Úkoly</div><div class="stat-number">'+data.tasks.length+'</div></div><div class="stat"><div class="stat-title">Záznamy historie</div><div class="stat-number">'+data.history.length+'</div></div></div><button class="button" type="button" data-action="exportCurrent">'+icon('download')+'Zálohovat aktuální přehled</button><label class="check-label" style="margin-top:22px"><input type="checkbox" name="confirmed" required>Chci nahradit aktuální přehled obsahem této zálohy.</label></div>'+modalFooter('Obnovit ze zálohy')+'</form>');
  }catch(e){showToast(e.message||'Zálohu nelze přečíst.')}
 }
