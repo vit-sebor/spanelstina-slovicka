@@ -1,0 +1,1 @@
+# spanelstina-slovicka
